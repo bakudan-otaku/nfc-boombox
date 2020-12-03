@@ -16,8 +16,6 @@ class NfcControl(threading.Thread):
     def __init__(self, client):
         threading.Thread.__init__(self)
         self.client = client
-        self.last_card = None
-        self.last_card_ts = None
 
         self.rdr = RFIDLocked()
         self.util = self.rdr.util()
@@ -29,6 +27,8 @@ class NfcControl(threading.Thread):
     def run(self):
         running = True
         # Use this ^ for threadsave stop
+        card_ts = None
+        last_card = None
         while running:
             running = self.rdr.wait_for_tag()
             # check if thread stop did kill the wait
@@ -53,42 +53,48 @@ class NfcControl(threading.Thread):
             
             (error, data) = self.util.dump_data()
             if error:
+                self.util.deauth()
                 continue
             card = MIFARE1k(uid, data)
             if card == None:
+                self.util.deauth()
                 continue
             
             with self.client:
                 status = self.client.status()
             # reset if not playing, so you can restart a Card if you stop first.
-
-            # da muss ich mir noch was überlegen
-            if card == self.last_card:
-                (datetime.now() - ts).seconds > 10
             
-            if not card == self.last_card:
-                self.last_card = card
-                self.last_card_ts = datetime.now()
-                messages = card.get_messages()
-                j = 0
-                for m in messages:
-                    print("j: " + str(j))
-                    j += 1
-                    ndefm = NdefMessage(m)
-                    i = 0
-                    for r in ndefm.records:
+            if card == last_card:
+                if (datetime.now() - card_ts).seconds < 10:
+                    # ignore and set ts:
+                    card_ts = datetime.now()
+                    self.util.deauth()
+                    continue
+            # save Timestamp and card:
+            last_card = card
+            card_ts = datetime.now()
+            
+            messages = card.get_messages()
+            j = 0
+            for m in messages:
+                print("j: " + str(j))
+                j += 1
+                ndefm = NdefMessage(m)
+                i = 0
+                for r in ndefm.records:
                                 
-                        # Check if text
-                        # split by :
-                        # Check for [0] = mpc
-                        # Check for [1] in commands
-                        print(str(i) + ":" + r.payload.get_contend())
-                        i += 1
-                time.sleep(1)
+                    # Check if text
+                    # split by :
+                    # Check for [0] = mpc
+                    # Check for [1] in commands
+                    print(str(i) + ":" + r.payload.get_contend())
+                    i += 1
 
 
             # We must stop crypto
             self.util.deauth()
+            # Cool down after everthing
+            time.sleep(1)
 
         self.rdr.cleanup()
 
