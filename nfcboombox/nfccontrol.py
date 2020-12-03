@@ -8,9 +8,28 @@ import time
 from datetime import datetime
 
 
-class MPDReccord:
+class MPDRecord:
+    valid_commands = [ "play", "clear", "stop", "add" ]
+    add_commands = [ "play", "add"]
     def __init__(self, record_raw):
-        pass
+        self.raw = record_raw
+        self.command = ""
+        self.arg = ""
+
+    def validate(self):
+        raw = self.raw.split(':')
+        if not raw[0] == "mpc":
+            return False
+
+        if not raw[1] in self.valid_commands:
+            return False
+
+        self.command = raw[1]
+
+        if len(raw) > 2 and self.command in self.add_commands:
+            self.arg = raw[2]
+
+        return True
     
 class NfcControl(threading.Thread):
     def __init__(self, client):
@@ -55,9 +74,12 @@ class NfcControl(threading.Thread):
             if error:
                 self.util.deauth()
                 continue
+
+            # We must stop crypto
+            self.util.deauth()
+            
             card = MIFARE1k(uid, data)
             if card == None:
-                self.util.deauth()
                 continue
             
             with self.client:
@@ -68,31 +90,51 @@ class NfcControl(threading.Thread):
                 if (datetime.now() - card_ts).seconds < 10:
                     # ignore and set ts:
                     card_ts = datetime.now()
-                    self.util.deauth()
                     continue
             # save Timestamp and card:
             last_card = card
             card_ts = datetime.now()
             
             messages = card.get_messages()
-            j = 0
+            commands = []
+            i = 0
             for m in messages:
-                print("j: " + str(j))
-                j += 1
                 ndefm = NdefMessage(m)
-                i = 0
                 for r in ndefm.records:
                                 
                     # Check if text
+                    # My Format for Text Record: mpc:clear|play|stop|add:MusicPath
+                    # MusicPath optional with play, "must" with add
                     # split by :
                     # Check for [0] = mpc
                     # Check for [1] in commands
-                    print(str(i) + ":" + r.payload.get_contend())
-                    i += 1
+                    if r.payload.rtd_type == "Text":
+                        print(str(i) + ":" + r.payload.get_contend())
+                        i += 1
+                        commands.append(MPDRecord(r.payload.get_contend()))
 
-
-            # We must stop crypto
-            self.util.deauth()
+            add = []
+            clear = False
+            stop = False
+            play = False
+            for command in commands:
+                if command.validate():
+                    clear = clear or command.command == "clear"
+                    stop = stop or command.command == "stop"
+                    play = play or command.command == "play"
+                    if not command.arg == "":
+                        clear = clear or command.command == "play"
+                        add.append(command.arg)
+            
+            with self.client:
+                if stop:
+                    self.client.stop()
+                if clear:
+                    self.client.clear()
+                for a in add:
+                    self.client.add(a)
+                if play:
+                    self.client.play(0)
             # Cool down after everthing
             time.sleep(1)
 
