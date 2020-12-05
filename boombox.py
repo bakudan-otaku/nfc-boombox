@@ -34,13 +34,12 @@ class CheckStatus(threading.Thread):
 
 
 class BoomBox:
-    modules = []
-    client = None
     
     def __init__(self):
         self.client = LockableMPDClient()
         self.client.connect("localhost", 6600)
-
+        self.modules = []
+        
         module = CheckStatus(self.client)
         self.modules.append(module)
 

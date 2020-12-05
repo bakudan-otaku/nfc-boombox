@@ -27,13 +27,16 @@ class MPDRecord:
         self.command = raw[1]
 
         if len(raw) > 2 and self.command in self.add_commands:
-            self.arg = raw[2]
+            for i in range(2, len(raw)):
+                self.arg += raw[i]
+                if not (i + 1) == len(raw):
+                    self.arg += ":"
 
         return True
     
 class NfcControl(threading.Thread):
     def __init__(self, client):
-        threading.Thread.__init__(self)
+        super(NfcControl, self).__init__()
         self.client = client
 
         self.rdr = RFIDLocked()
@@ -103,7 +106,8 @@ class NfcControl(threading.Thread):
                 for r in ndefm.records:
                                 
                     # Check if text
-                    # My Format for Text Record: mpc:clear|play|stop|add:MusicPath
+                    # My Format for Text Record: mpc:clear|play|stop|add:arg
+                    # Todo: volume
                     # MusicPath optional with play, "must" with add
                     # split by :
                     # Check for [0] = mpc
@@ -125,13 +129,15 @@ class NfcControl(threading.Thread):
                     if not command.arg == "":
                         clear = clear or command.command == "play"
                         add.append(command.arg)
-            
+
+            # Todo: catch Exceptions
             with self.client:
                 if stop:
                     self.client.stop()
                 if clear:
                     self.client.clear()
                 for a in add:
+                    print("add: '" + a + "'")
                     self.client.add(a)
                 if play:
                     self.client.play(0)
