@@ -6,7 +6,7 @@ from .pirc522 import RFIDLocked, NdefMessage, MIFARE1k
 import threading
 import time
 from datetime import datetime
-
+import RPi.GPIO as GPIO
 
 class MPDRecord:
     valid_commands = [ "play", "clear", "stop", "add" ]
@@ -45,6 +45,8 @@ class NfcControl(threading.Thread):
     def stop(self):
         # running should be locked
         self.rdr.stop()
+
+        GPIO.cleanup()
 
     def run(self):
         running = True
@@ -146,8 +148,3 @@ class NfcControl(threading.Thread):
 
         self.rdr.cleanup()
 
-
-
-            
-        
-    
