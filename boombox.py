@@ -54,14 +54,14 @@ class myButton(Button):
         super(myButton, self).__init__(
             pin, pull_up=pull_up, active_state=active_state, bounce_time=bounce_time,
             hold_time=hold_time, hold_repeat=hold_repeat, pin_factory=pin_factory)
-        self.other=other
+        self.gpioC=gpioC
 
 """
 overlooks all GPIOs.
 """
 class GPIOControl(threading.Thread):
     def __init__(self, client, playGPIO, stopGPIO, nextGPIO, previousGPIO, vollUpGPIO, vollDownGPIO, powerLED = None, vollMax=100.0 ):
-        threading.Tread.__init__(self)
+        threading.Thread.__init__(self)
         self.client = client
         self.shutdown = threading.Event()
         self.shutdown.clear()
@@ -91,7 +91,7 @@ class GPIOControl(threading.Thread):
             self.shutdown.wait(timeout=0.2)
 
     def stop(self):
-        self.shutdown_event.set()
+        self.shutdown.set()
 
     def playB(self):
         print("play")
@@ -125,7 +125,7 @@ class GPIOControl(threading.Thread):
         print("vollUp")
         with self.gpioC.client:
             vol = int(self.gpioC.client.status()['volume'])
-            if not vol == self.gpioC.max_vol:
+            if not vol == self.gpioC.vollMax:
                 self.gpioC.client.setvol(vol + 1)
 
     def vollDownB(self):
@@ -148,7 +148,7 @@ class BoomBox(object):
         module = NfcControl(self.client)
         self.modules.append(module)
 
-        module = GPIOControl(self.client)
+        module = GPIOControl(self.client, def_playButton, def_stopButton, def_nextButton, def_previousButton, def_vollUpButton, def_vollDownButton, vollMax = 35.0)
         self.modules.append(module)
 
     def main(self):
