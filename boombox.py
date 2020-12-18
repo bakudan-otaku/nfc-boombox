@@ -16,8 +16,8 @@ def_playButton = 15 # Pin 10
 def_stopButton = 26 # Pin 37
 def_nextButton = 27 # Pin 13
 def_previousButton = 16 # Pin 36
-def_vollUpButton = 17 # Pin 11
-def_vollDownButton = 23 # Pin 16
+def_volUpButton = 17 # Pin 11
+def_volDownButton = 23 # Pin 16
 def_powerLED = 12 # Pin 32
 def_pull_up_down = None
 def_active = False
@@ -60,7 +60,7 @@ class myButton(Button):
 overlooks all GPIOs.
 """
 class GPIOControl(threading.Thread):
-    def __init__(self, client, playGPIO, stopGPIO, nextGPIO, previousGPIO, vollUpGPIO, vollDownGPIO, powerLED = None, vollMax=100.0 ):
+    def __init__(self, client, playGPIO, stopGPIO, nextGPIO, previousGPIO, volUpGPIO, volDownGPIO, powerLED = None, volMax=100.0 ):
         threading.Thread.__init__(self)
         self.client = client
         self.shutdown = threading.Event()
@@ -70,10 +70,10 @@ class GPIOControl(threading.Thread):
         self.stopButton = myButton(gpioC=self, pin=stopGPIO)
         self.nextButton = myButton(gpioC=self, pin=nextGPIO)
         self.previousButton = myButton(gpioC=self, pin=previousGPIO)
-        self.vollUpButton = myButton(gpioC=self, pin=vollUpGPIO, hold_repeat=True)
-        self.vollDownButton = myButton(gpioC=self, pin=vollDownGPIO, hold_repeat=True)
+        self.volUpButton = myButton(gpioC=self, pin=volUpGPIO, hold_repeat=True)
+        self.volDownButton = myButton(gpioC=self, pin=volDownGPIO, hold_repeat=True)
         self.powerLED = powerLED
-        self.vollMax = vollMax
+        self.volMax = volMax
 
         if self.powerLED != None:
             pass
@@ -83,11 +83,11 @@ class GPIOControl(threading.Thread):
         self.stopButton.when_pressed = GPIOControl.stopB
         self.nextButton.when_pressed = GPIOControl.nextB
         self.previousButton.when_pressed = GPIOControl.previousB
-        self.vollUpButton.when_held = GPIOControl.vollUpB
-        self.vollDownButton.when_held = GPIOControl.vollDownB
+        self.volUpButton.when_held = GPIOControl.volUpB
+        self.volDownButton.when_held = GPIOControl.volDownB
 
         while not self.shutdown.is_set():
-            # vollume -> LED handling
+            # volume -> LED handling
             self.shutdown.wait(timeout=0.2)
 
     def stop(self):
@@ -121,18 +121,18 @@ class GPIOControl(threading.Thread):
             if not status['state'] == 'stop':
                 self.gpioC.client.previous()
 
-    def vollUpB(self):
-        print("vollUp")
+    def volUpB(self):
+        print("volUp")
         with self.gpioC.client:
             vol = int(self.gpioC.client.status()['volume'])
-            if not vol == self.gpioC.vollMax:
+            if vol <= self.gpioC.volMax:
                 self.gpioC.client.setvol(vol + 1)
 
-    def vollDownB(self):
-        print("vollDown")
+    def volDownB(self):
+        print("volDown")
         with self.gpioC.client:
             vol = int(self.gpioC.client.status()['volume'])
-            if not vol == 0:
+            if vol > 0:
                 self.gpioC.client.setvol(vol - 1)
 
 class BoomBox(object):
@@ -148,7 +148,7 @@ class BoomBox(object):
         module = NfcControl(self.client)
         self.modules.append(module)
 
-        module = GPIOControl(self.client, def_playButton, def_stopButton, def_nextButton, def_previousButton, def_vollUpButton, def_vollDownButton, vollMax = 35.0)
+        module = GPIOControl(self.client, def_playButton, def_stopButton, def_nextButton, def_previousButton, def_volUpButton, def_volDownButton, volMax = 35.0)
         self.modules.append(module)
 
     def main(self):

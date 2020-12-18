@@ -8,9 +8,9 @@ import time
 from datetime import datetime
 import RPi.GPIO as GPIO
 
-class MPDRecord:
-    valid_commands = [ "play", "clear", "stop", "add" ]
-    add_commands = [ "play", "add"]
+class MPDRecord(object):
+    valid_commands = [ "play", "clear", "stop", "add", "volume" ]
+    arg_commands = [ "play", "add", "volume"]
     def __init__(self, record_raw):
         self.raw = record_raw
         self.command = ""
@@ -26,11 +26,12 @@ class MPDRecord:
 
         self.command = raw[1]
 
-        if len(raw) > 2 and self.command in self.add_commands:
-            for i in range(2, len(raw)):
-                self.arg += raw[i]
-                if not (i + 1) == len(raw):
-                    self.arg += ":"
+        if len(raw) > 2:
+            if self.command in self.arg_commands:
+                for i in range(2, len(raw)):
+                    self.arg += raw[i]
+                    if not (i + 1) == len(raw):
+                        self.arg += ":"
 
         return True
     
@@ -109,8 +110,7 @@ class NfcControl(threading.Thread):
                                 
                     # Check if text
                     # My Format for Text Record: mpc:clear|play|stop|add:arg
-                    # Todo: volume
-                    # MusicPath optional with play, "must" with add
+                    # MusicPath optional with play, "must" with add and volume
                     # split by :
                     # Check for [0] = mpc
                     # Check for [1] in commands
@@ -123,14 +123,21 @@ class NfcControl(threading.Thread):
             clear = False
             stop = False
             play = False
+            volume = False
+            volumeValue = ""
             for command in commands:
                 if command.validate():
                     clear = clear or command.command == "clear"
                     stop = stop or command.command == "stop"
                     play = play or command.command == "play"
+                    volume = volume or command.command == "volume"
                     if not command.arg == "":
-                        clear = clear or command.command == "play"
-                        add.append(command.arg)
+                        if command.command in ["add", "play"]:
+                            clear = clear or command.command == "play"
+                            add.append(command.arg)
+                        if command.command == "volume":
+                            volumeValue = int(command.arg)
+                            # Todo: check for volMax
 
             # Todo: catch Exceptions
             with self.client:
@@ -138,6 +145,8 @@ class NfcControl(threading.Thread):
                     self.client.stop()
                 if clear:
                     self.client.clear()
+                if volume:
+                    self.client.setvol(volumeValue)
                 for a in add:
                     print("add: '" + a + "'")
                     self.client.add(a)
